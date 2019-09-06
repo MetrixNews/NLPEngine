@@ -3,3 +3,6 @@ SqlHandler.py
 data/
 NRC/
 pandas/
+__pycache__/
+.DS_store
+pipfile
