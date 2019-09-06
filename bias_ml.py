@@ -28,6 +28,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import normalize 
 from sklearn.feature_selection import RFECV
+from sklearn.ensemble import VotingClassifier
 
 #Classification Models
 from sklearn.multiclass import OneVsRestClassifier
@@ -54,7 +55,7 @@ def main():
    numcols = 0
 
    j = 0
-   max_count = 500
+   max_count = 2000
 
    with open('data/articles.csv', 'r') as f:
       
@@ -68,29 +69,6 @@ def main():
          for row in reader:
             if j == max_count:
                break
-
-            # 0 
-            # 1 - id
-            # 2 - source_name
-            # 3 - title X
-            # 4 - url X
-            # 5 - published_at X
-            # 6 - vaderpos
-            # 7 - vaderneu
-            # 8 - vaderneg
-            # 9 - anger
-            # 10 - anticipation
-            # 11 - disgust
-            # 12 - fear
-            # 13 - joy
-            # 14 - sadness
-            # 15 - surprise
-            # 16 - trust
-            # 17 - topic
-            # 18 - biasness
-            # 19 - political_bias
-            # 20 - topic
-            # 21.. - tfidf
 
             article = []
             for i in range(0, numcols):
@@ -132,23 +110,7 @@ def main():
    print(X.shape)
    print(Y.shape)
 
-   # kf = KFold(n_splits=3, shuffle=True, random_state=None)
-   # #kf.get_n_splits(X)
-
-   # print(kf)  
-
-   # for train_index, test_index in kf.split(X):
-   #    print("TRAIN:", train_index, "TEST:", test_index)
-   #    X_train, X_test = X[train_index], X[test_index]
-   #    y_train, y_test = Y[train_index], Y[test_index]
-
    x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.22, random_state=42)
-
-   #Classifier Showdown
-
-   #OneVsRestClassifier(KNeighborsClassifier(n_neighbors=10)),
-   #OneVsRestClassifier(RadiusNeighborsClassifier()),
-   #OneVsRestClassifier(NearestCentroid()),  
 
    classifiers = [   
       OneVsRestClassifier(LinearSVC(max_iter=4000)),
@@ -170,7 +132,7 @@ def main():
       name = clf.estimator.__class__.__name__
 
       clf.fit(x_train, y_train)
-      rfe = RFECV(clf, step=10)
+      rfe = RFECV(clf, step=50)
       rfe.fit(x_train, y_train)
 
       print("="*30)
@@ -179,29 +141,13 @@ def main():
 
       train_predictions = clf.predict(x_test)
 
-      # prec = precision_recall_fscore_support(y_test, train_predictions, labels=None, pos_label=1, average='micro', sample_weight=None)
-      # print("Precision: {:.4%}".format(prec[0]))
-      # log_entry = pd.DataFrame([[name, 'Precision', prec[0]]], columns=log_cols)
-      # log = log.append(log_entry)
-      
-      # recall = recall_score(y_test, train_predictions, labels=None, pos_label=1, average='micro', sample_weight=None)
-      # print("Recall: {:.4%}".format(recall))
-      # log_entry = pd.DataFrame([[name, 'Recall', recall]], columns=log_cols)
-      # log = log.append(log_entry)
-
       f1 = f1_score(y_test, train_predictions, labels=None, pos_label=1, average='micro', sample_weight=None)
       print("F1: {:.4%}".format(f1))
       log_entry = pd.DataFrame([[name, 'F1', f1]], columns=log_cols)
-      log = log.append(log_entry)
-      
-      # auc = roc_auc_score(y_true, y_score, average='macro', sample_weight=None, max_fpr=None)
-      # print("AUC: {:.4%}".format(auc))
+      log = log.append(log_entry)      
 
       cm = confusion_matrix(y_test, train_predictions, labels=None, sample_weight=None)
       print(cm)
-
-      #log_entry = pd.DataFrame([[name, prec[0], recall, f1]], columns=log_cols)
-      #log = log.append(log_entry)
 
    print("="*30)
 
@@ -213,30 +159,6 @@ def main():
    plt.xlabel('Precision %')
    plt.title('Classifier Precision')
    plt.show()
-
-   #Recall
-   #sns.set_color_codes("muted")
-   #sns.barplot(x='Recall', y='Classifier', data=log, color="g")
-
-   # plt.xlabel('Recall %')
-   # plt.title('Classifier Recall')
-   # plt.show()
-
-   #F1
-   # sns.set_color_codes("muted")
-   # sns.barplot(x='F1_measure', y='Classifier', data=log, color="r")
-
-   # plt.xlabel('F1 %')
-   # plt.title('Classifier F1')
-   # plt.show()
-
-   # #AUC
-   # sns.set_color_codes("muted")
-   # sns.barplot(x='AUC', y='Classifier', data=log, color="y")
-
-   # plt.xlabel('AUC %')
-   # plt.title('Classifier AUC')
-   # plt.show()
 
 if __name__ == "__main__":
     main()
