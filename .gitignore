@@ -7,3 +7,4 @@ __pycache__/
 .DS_store
 pipfile
 NLP.code-workspace
+logs/
