@@ -11,8 +11,6 @@
 # AJ's Note --> Objective is to train, test, and plot several multiclass classification models to figure out which one works best with our data to predict bias of articles. I am most familiar with
 # accuracy, precision, recall, and F1 measures to determine model performance. So can we plot all those for each model?
 
-#MPC TODO
-# Logging
 
 # Data processing / visualization]
 import math
@@ -31,13 +29,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import normalize 
 from sklearn.feature_selection import RFECV
 from sklearn.ensemble import VotingClassifier
-from sklearn.pipeline import Pipeline
-from sklearn import preprocessing
-
-import logging
-import os.path
-import logging.config
-import gc
+from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import GridSearchCV
 
 #Classification Models
 from sklearn.multiclass import OneVsRestClassifier
@@ -55,146 +48,161 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score
 
+import logging
+import os.path
+import logging.config
+import gc
+from slacker_log_handler import SlackerLogHandler, NoStacktraceFormatter
+
 #Import Data & Preparation
 def main():
-   csv.field_size_limit(100000000)
-
    news_corpus = []
 
    logging.info("Inserting articles into news_corpus[]")
-   # with open('data/articles.csv', 'r') as f:
-      
-   #    reader = csv.reader((line.replace('\0', '') for line in f), delimiter=',')
-      
-   #    numcols = len(next(reader))
-   #    f.seek(0)
+   news_corpus = pd.read_csv('data/articles_trimmed.csv')
 
-   #    next(reader)
-   #    next(reader)
+   logging.info(news_corpus)
+      # 0 
+      # 1 - id
+      # 2 - source_name
+      # 3 - title X
+      # 4 - url X
+      # 5 - published_at X
+      # 6 - vaderpos
+      # 7 - vaderneu
+      # 8 - vaderneg
+      # 9 - anger
+      # 10 - anticipation
+      # 11 - disgust
+      # 12 - fear
+      # 13 - joy
+      # 14 - sadness
+      # 15 - surprise
+      # 16 - trust
+      # 17 - topic
+      # 18 - biasness
+      # 19 - political_bias
+      # 20 - topic
+      # 21.. - tfidf
 
-   #    for row in reader:
-   #       try:
-   #          article = []
-   #          for i in range(0, numcols):
-   #             article.append(row[i])
-   #          news_corpus.append(article)
-   #       except Exception as e:
-   #          print(e)
-   #    del article
+   #Cross Validation Data Partition
+   logging.info("Splitting data into X and Y")
+   X = []
+   Y = []
+   for index, row in news_corpus.iterrows():
+      X.append(row)
+      Y.append(row['political_bias'])
 
-   df_chunk = pd.read_csv(r'data/articles.csv', chunksize=5000)
+   logging.info("Converting X to dataframe")
+   X = pd.DataFrame(X)
 
-   logging.info("Garbage Collection...")
-   gc.collect()
+   X = X.drop(['political_bias'], axis=1)
 
-  #Cross Validation Data Partition
-   X_arr = []
-   Y_arr = []
-   # logging.info("Partitioning news_corpus into X and Y arrays")
-   # for article in news_corpus:     
-   #    tmp_x = []
-   #    for i in range(0, numcols):
-   #       if i == 19:
-   #          continue
-   #       else:
-   #          tmp_x.append(article[i])
-   #    X.append(tmp_x)
-   #    Y.append([article[19]])
+   logging.info(X)
+
+   logging.info("Preforming get_dummie on X")
+   X = pd.get_dummies(X, dtype=float, columns=['topic', 'source_name', 'biasness'])
    
-   # del tmp_x
-   # del news_corpus
+   logging.info(X)
 
-   for chunk in df_chunk:
-      tmp_x = []
-      for i in range(0, numcols):
-         if i == 19:
-            continue
-         else:
-            tmp_x.append(chunk[i])
-      X_arr.append(tmp_x)
-      Y.append([chunk[19]])
+   logging.info("Coverting X to array")
+   X = np.array(X)
+   logging.info('Converting Y to array')
+   Y = np.array(Y)
 
-   logging.info("Garbage Collection...")
-   gc.collect()
+   logging.info(X.shape)
+   logging.info(Y.shape)
 
-   logging.info("Converting X to DataFrame")
+   logging.info("Splitting X and Y into x_train, x_test, y_train, y_test. test_size=0.22, random_state=42")
+   x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.22, random_state=42, shuffle=True)
+   
 
-   # logging.info("Converting X to dictionary")
-   # X_dict = X.to_dict(orient='records') 
+   # OneVsRestClassifier(DecisionTreeClassifier()),
+   # OneVsRestClassifier(RandomForestClassifier()),
+   # OneVsRestClassifier(AdaBoostClassifier()),
+   # OneVsRestClassifier(GaussianNB()),
+   # OneVsRestClassifier(BernoulliNB()),
+   # OneVsRestClassifier(LogisticRegression()),
+   # OneVsRestClassifier(RidgeClassifier())
 
-   # logging.info("Creating DictVectorizer Spase=False")
-   # dv_X = DictVectorizer(sparse=False)
+   # rfe = RFECV(clf, step=50)
+   # rfe.fit(x_train, y_train)
 
-   # logging.info("Performing DictVectorization on X using X_dict")
-   # X = dv_X.fit_transform(X_dict)
+   #gbc = GradientBoostingClassifier()
+   clf = GradientBoostingClassifier(learning_rate=0.2, n_estimators=70, min_samples_split=500, min_samples_leaf=50, max_depth=20, max_features='sqrt', subsample=0.8)
 
-   logging.info("Performing get_dummies on X. dummy_na=True, sparse=True")
-   X_dummy = pd.get_dummies(X_arr, dummy_na=True, sparse=True)
+   # parameters = {
+   #    'n_estimators':
+   #    [
+   #       50, 75, 100, 250, 500, 1000
+   #    ],
+   #    'learning_rate':
+   #    [
+   #       1.0, 0.75, 0.50, 0.25, 0.10, 0.01, 0.001
+   #    ],
+   #    'min_samples_split':
+   #    [
+   #       0.01, 0.001, 0.0001
+   #    ],
+   #    'max_features':
+   #    [
+   #       'auto', 'log2', 'None'
+   #    ]
+   # }
 
-   logging.info("Convering X to numpy array")
-   X = np.array(X_dummy)
-   logging.info("Convering Y to numpy array")
-   Y = np.array(Y_arr)
+   #clf = GridSearchCV(estimator=gbc, param_grid=parameters, cv=StratifiedKFold(10))
+   
+   name = 'Gradient Boosting Classifier'
+   
+   rfecv = RFECV(estimator=clf, step=50, cv=StratifiedKFold(5), scoring='accuracy', n_jobs=-1)
 
-   logging.info(f"X shape {X.shape}")
-   logging.info(f"Y Shape {Y.shape}")
+   logging.info(f"Running {name} Classifier")
 
-   logging.info("Generating x_train, x_test, y_train, y_test. test_size=0.22, random_state=42")
-   x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.22, random_state=42)
+   rfecv.fit(x_train, y_train)
 
-   del X
-   del Y
-   logging.info("Garbage Collection...")
-   gc.collect()
+   logging.info('Optimal number of features: {}'.format(rfecv.n_features_))
 
-      #OneVsRestClassifier(DecisionTreeClassifier()),
-      #OneVsRestClassifier(RandomForestClassifier()),
-      #OneVsRestClassifier(GaussianNB()),
-      #OneVsRestClassifier(BernoulliNB()),
+   logging.info(f'Dropping Features: {np.where(rfecv.support_ == False)[0]}')
 
-   classifiers = [   
+   x_train.drop(x_train.columns[np.where(rfecv.support_ == False)[0]], axis=1, inplace=True)
 
-      OneVsRestClassifier(AdaBoostClassifier()),
-      OneVsRestClassifier(GradientBoostingClassifier())
-      
-   ]
+   clf.fit(x_train, y_train)
 
-   logging.info("Beginning Classification")
-   for clf in classifiers:
-      try:
-         name = clf.estimator.__class__.__name__
+   train_predictions = clf.predict(x_test)
 
-         clf.fit(x_train, y_train)
+   f1 = f1_score(y_test, train_predictions, labels=None, pos_label=1, average='micro', sample_weight=None)
+   logging.info("Results (Accuracy): {:.4%}".format(f1)) 
 
-         logging.info("="*30)
-         
-         logging.info('****Results****')
-         print()
-         logging.info(name)
-         logging.info('***************')
+   cm = confusion_matrix(y_test, train_predictions, labels=None, sample_weight=None)
+   logging.info(f"Confusion Matrix: \n{cm}")
 
-         # pipe = PipelineREF([
-         #    ('stf_scaler', preprocessing.StandardScaler()),
-         #    ('ET', clf)
-         # ])
-         # rfe = RFECV(clf, step=50, min_features_to_select=300)
-         # rfe.fit(x_train, y_train)
+   #plotting
+   fig = plt.figure(figsize=(16, 9))
+   plt.title('Recursive Feature Elimination with Cross-Validation', fontsize=18, fontweight='bold', pad=20)
+   plt.xlabel('Number of features selected', fontsize=14, labelpad=20)
+   plt.ylabel('% Correct Classification', fontsize=14, labelpad=20)
+   plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, color='#303F9F', linewidth=3)
+   plt.savefig('data/Recursive Feature Elimination With Cross-Validation.png')
+   plt.close(fig)
 
-         #feature_selector_cv = RFECV(pipe, step=50, min_features_to_select=300)
-         #feature_selector_cv.fit(x_test, Y)
-         
-         train_predictions = clf.predict(x_test)
-         #train_predictions = feature_selector_cv.predict(x_test)
+   dset = pd.DataFrame()
+   dset['attr'] = x_train.columns
+   dset['importance'] = rfecv.estimator_.feature_importances_
 
-         f1 = f1_score(y_test, train_predictions, labels=None, pos_label=1, average='micro', sample_weight=None)
-         logging.info("F1: {:.4%}\n".format(f1))
-      except Exception as e:
-         print(e)
-         continue
+   dset = dset.sort_values(by='importance', ascending=False)
+   logging.info(dset)
+
+   fig2 = plt.figure(figsize=(16, 14))
+   plt.barh(y=dset['attr'], width=dset['importance'], color='#1976D2')
+   plt.title('RFECV - Feature Importances', fontsize=20, fontweight='bold', pad=20)
+   plt.xlabel('Importance', fontsize=14, labelpad=20)
+   plt.savefig('data/RFECV - Feature Importance.png')
+   plt.close(fig2)
 
    logging.info("="*30)
 
 if __name__ == "__main__":
+   slack_handler = SlackerLogHandler('xoxp-380126610855-379116498995-764208393409-f350bee66032dac0403daecba5cf787e', 'Logs', stack_trace=True)
    logging.basicConfig(level=logging.INFO, 
    format='%(levelname)s:%(asctime)s:%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
    handlers=[
@@ -204,25 +212,23 @@ if __name__ == "__main__":
 
    logger = logging.getLogger()
 
-   logger.info('bias_ml.py started')
+   logger.addHandler(slack_handler)
+
+   formatter = NoStacktraceFormatter('%(levelname)s:%(asctime)s:%(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+   slack_handler.setFormatter(formatter)
+
+   slack_handler.setLevel(logging.DEBUG)
+
+   logging.info('<@UB53EENV9> and <@UB63QHZ2B>, bias_ml.py started')
 
    main()
 
-   logging.debug('bias_ml.py Finished')
+   logging.info('<@UB53EENV9> and <@UB63QHZ2B>, bias_ml.py Finished')
 
    logging.shutdown()
-
-class PipelineREF(Pipeline):
-   def fit(self, X, y=None, **fit_params):
-      super(PipelineREF, self).fit(X, y, **fit_params)
-      self.feature_importance_ = self.steps[-1][-1].feature_importance_
-      return self
 
 
 # Once we choose which models to use and refine the chosen models, we can do one of two things: 
 # 1) Choose the highest performing model to deploy
 # 2) Keep all well-performing models and create a voting system. Ex: 6 models say article is center, 1 says it is liberal, and 1 says it is conservative.
 #    Voting system would take the majority vote to label it center 
-
-
-# Push to deployment
