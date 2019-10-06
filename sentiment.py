@@ -132,7 +132,7 @@ def main():
    # with open() as csvfile:
    csv.field_size_limit(100000000)
 
-   with open('data/news_corpus.txt', 'r') as f:
+   with open('../data/news_corpus.txt', 'r') as f:
       reader = csv.reader((line.replace('\0', '') for line in f), delimiter='\t')
       try:
          print("Scraping CSV...", end="", flush=True)
